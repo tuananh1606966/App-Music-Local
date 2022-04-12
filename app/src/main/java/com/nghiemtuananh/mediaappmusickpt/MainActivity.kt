@@ -1,12 +1,16 @@
 package com.nghiemtuananh.mediaappmusickpt
 
+import android.annotation.SuppressLint
 import android.media.MediaPlayer
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Handler
+import android.os.SystemClock
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.SeekBar
+import io.reactivex.Observable
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
 import java.text.SimpleDateFormat
 
@@ -15,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     var position = 0
     lateinit var mediaPlayer: MediaPlayer
     lateinit var animation: Animation
+    private lateinit var dinhDangGio: SimpleDateFormat
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -92,14 +97,36 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    @SuppressLint("CheckResult", "SimpleDateFormat")
     private fun updateTimeSong() {
-        var mHandler = Handler()
-        mHandler.postDelayed(object : Runnable {
-            override fun run() {
-                var dinhDangGio = SimpleDateFormat("mm:ss")
-                tv_time_song.setText(dinhDangGio.format(mediaPlayer.currentPosition))
-                sb_time.setProgress(mediaPlayer.currentPosition)
-                // kiểm tra thời gian bài hát -> nếu kết thúc -> next
+//        val mHandler = Handler()
+//        mHandler.postDelayed(object : Runnable {
+//            @SuppressLint("SimpleDateFormat")
+//            override fun run() {
+//                val dinhDangGio = SimpleDateFormat("mm:ss")
+//                tv_time_song.text = dinhDangGio.format(mediaPlayer.currentPosition)
+//                sb_time.progress = mediaPlayer.currentPosition
+//                // kiểm tra thời gian bài hát -> nếu kết thúc -> next
+//                mediaPlayer.setOnCompletionListener {
+//                    position++
+//                    if (position > arraySong.size - 1) {
+//                        position = 0
+//                    }
+//                    if (mediaPlayer.isPlaying) {
+//                        mediaPlayer.stop()
+//                    }
+//                    khoiTaoMediaPlayer()
+//                    mediaPlayer.start()
+//                    ibtn_play.setBackgroundResource(R.drawable.pause)
+//                    setTimeTotal()
+//                }
+//                mHandler.postDelayed(this, 500)
+//            }
+//        }, 100)
+        Observable.create<Int> { emitter ->
+            dinhDangGio = SimpleDateFormat("mm:ss")
+            while (true) {
+                emitter.onNext(1)
                 mediaPlayer.setOnCompletionListener {
                     position++
                     if (position > arraySong.size - 1) {
@@ -108,26 +135,43 @@ class MainActivity : AppCompatActivity() {
                     if (mediaPlayer.isPlaying) {
                         mediaPlayer.stop()
                     }
-                    khoiTaoMediaPlayer()
-                    mediaPlayer.start()
-                    ibtn_play.setBackgroundResource(R.drawable.pause)
-                    setTimeTotal()
+                    emitter.onNext(2)
                 }
-                mHandler.postDelayed(this, 500)
+                SystemClock.sleep(500)
             }
-        }, 100)
+        }.subscribeOn(Schedulers.newThread())
+            .observeOn(AndroidSchedulers.mainThread())
+            .subscribe(
+                {
+                    when (it) {
+                        1 -> {
+                            tv_time_song.text = dinhDangGio.format(mediaPlayer.currentPosition)
+                            sb_time.progress = mediaPlayer.currentPosition
+                        }
+                        2 -> {
+                            khoiTaoMediaPlayer()
+                            mediaPlayer.start()
+                            ibtn_play.setBackgroundResource(R.drawable.pause)
+                            setTimeTotal()
+                        }
+                    }
+                },
+                {},
+                {}
+            )
     }
 
+    @SuppressLint("SimpleDateFormat")
     private fun setTimeTotal() {
-        var dinhDangGio = SimpleDateFormat("mm:ss")
-        tv_time_total.setText(dinhDangGio.format(mediaPlayer.duration))
+        dinhDangGio = SimpleDateFormat("mm:ss")
+        tv_time_total.text = dinhDangGio.format(mediaPlayer.duration)
         // gán max của sbSong = mediaPlayer.duration
         sb_time.max = mediaPlayer.duration
     }
 
     private fun khoiTaoMediaPlayer() {
-        mediaPlayer = MediaPlayer.create(this, arraySong.get(position).file)
-        tv_title.setText(arraySong.get(position).title)
+        mediaPlayer = MediaPlayer.create(this, arraySong[position].file)
+        tv_title.text = arraySong[position].title
     }
 
     private fun addSong() {
